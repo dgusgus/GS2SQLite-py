@@ -1,0 +1,6 @@
+# Credenciales y datos sensibles
+*.json
+.env
+*.db
+__pycache__/
+venv/
