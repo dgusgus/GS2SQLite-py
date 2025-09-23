@@ -1,33 +1,98 @@
 # config.py - Configuraciones centralizadas
 import os
-from pathlib import Path
 
-# Configuración de Google Sheets
-SCOPES = [
-    'https://www.googleapis.com/auth/spreadsheets.readonly',
-    'https://www.googleapis.com/auth/drive.readonly'
-]
+# === CONFIGURACIÓN GOOGLE SHEETS ===
+SPREADSHEET_ID = "1ehySw2tVI1l8INo4fgE7kEGFd0Kb2miPs7vCqsFZC8I"
+CREDENTIALS_FILE = "generador-docs-31f4b831a196.json"
 
-# IDs y rutas
-SPREADSHEET_ID = os.getenv('SPREADSHEET_ID', "1ehySw2tVI1l8INo4fgE7kEGFd0Kb2miPs7vCqsFZC8I")
-CREDENTIALS_PATH = os.getenv('CREDENTIALS_PATH', "generador-docs-31f4b831a196.json")
-DATABASE_PATH = os.getenv('DATABASE_PATH', "../database/operadores.db")
+# === CONFIGURACIÓN BASE DE DATOS ===
+DATABASE_PATH = "../database/operadores.db"
 
-# Configuración de logging
-LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
-LOG_FORMAT = '%(asctime)s - %(levelname)s - %(message)s'
-
-# Mapeo de hojas esperadas en Google Sheets
-EXPECTED_SHEETS = {
+# === MAPEO DE HOJAS GOOGLE SHEETS ===
+# Cambia estos nombres si tus hojas se llaman diferente
+SHEET_NAMES = {
     'jefes': 'Jefes',
-    'coordinadores': 'Coordinadores', 
-    'grupos': 'Grupos',
+    'coordinadores': 'Coordinadores',
+    'grupos': 'Grupos', 
     'departamentos': 'Departamentos',
     'provincias': 'Provincias',
     'municipios': 'Municipios',
-    'asientos_electorales': 'Asientos Electorales',
+    'asientos': 'Asientos',
     'recintos': 'Recintos',
-    'vehiculos': 'Vehículos',
+    'vehiculos': 'Vehiculos',
     'choferes': 'Choferes',
     'operadores': 'Operadores'
+}
+
+# === MAPEO DE COLUMNAS ===
+# Si cambias nombres de columnas en Google Sheets, cámbialos aquí
+COLUMN_MAPPING = {
+    'jefes': {
+        'nombre': 'nombre',
+        'telefono': 'telefono', 
+        'email': 'email'
+    },
+    'coordinadores': {
+        'nombre': 'nombre',
+        'codigo': 'codigo_coordinador',
+        'jefe': 'jefe_nombre',
+        'telefono': 'telefono',
+        'email': 'email'
+    },
+    'grupos': {
+        'nombre': 'nombre_grupo',
+        'coordinador': 'coordinador_codigo',
+        'descripcion': 'descripcion'
+    },
+    'departamentos': {
+        'nombre': 'nombre',
+        'codigo': 'codigo'
+    },
+    'provincias': {
+        'nombre': 'nombre',
+        'codigo': 'codigo',
+        'departamento': 'departamento_codigo'
+    },
+    'municipios': {
+        'nombre': 'nombre',
+        'codigo': 'codigo',
+        'provincia': 'provincia_codigo'
+    },
+    'asientos': {
+        'nombre': 'nombre',
+        'codigo': 'codigo',
+        'municipio': 'municipio_codigo'
+    },
+    'recintos': {
+        'nombre': 'nombre',
+        'direccion': 'direccion',
+        'tipo': 'tipo',
+        'asiento': 'asiento_codigo',
+        'latitud': 'latitud',
+        'longitud': 'longitud'
+    },
+    'vehiculos': {
+        'placa': 'placa',
+        'marca': 'marca',
+        'modelo': 'modelo',
+        'anio': 'anio'
+    },
+    'choferes': {
+        'nombre': 'nombre',
+        'cedula': 'cedula',
+        'licencia': 'licencia',
+        'telefono': 'telefono',
+        'vehiculo': 'vehiculo_placa'
+    },
+    'operadores': {
+        'nombre': 'nombre',
+        'cedula': 'cedula',
+        'telefono': 'telefono',
+        'tipo': 'tipo_operador',
+        'grupo': 'grupo_nombre',
+        'recinto': 'recinto_nombre',
+        'vehiculo': 'vehiculo_placa',
+        'fecha_inicio': 'fecha_inicio',
+        'fecha_fin': 'fecha_fin'
+    }
 }
