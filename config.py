@@ -9,90 +9,90 @@ CREDENTIALS_FILE = "generador-docs-31f4b831a196.json"
 DATABASE_PATH = "../database/operadores.db"
 
 # === MAPEO DE HOJAS GOOGLE SHEETS ===
-# Cambia estos nombres si tus hojas se llaman diferente
 SHEET_NAMES = {
     'jefes': 'Jefes',
-    'coordinadores': 'Coordinadores',
-    'grupos': 'Grupos', 
+    'coordinadores': 'Coordinadores', 
+    'grupos': 'Grupos',
     'departamentos': 'Departamentos',
     'provincias': 'Provincias',
     'municipios': 'Municipios',
-    'asientos': 'Asientos',
+    'asientos_electorales': 'Asientos_Electorales',  # Cambiado a plural
     'recintos': 'Recintos',
-    'vehiculos': 'Vehiculos',
-    'choferes': 'Choferes',
-    'operadores': 'Operadores'
+    'operadores': 'Operadores',
+    'notarios': 'Notarios',
+    'actas': 'Actas',
+    'cuentas': 'Cuentas'
 }
 
-# === MAPEO DE COLUMNAS ===
-# Si cambias nombres de columnas en Google Sheets, cámbialos aquí
+# === MAPEO DE COLUMNAS ACTUALIZADO ===
 COLUMN_MAPPING = {
     'jefes': {
         'nombre': 'nombre',
-        'telefono': 'telefono', 
-        'email': 'email'
+        'cargo': 'cargo',
+        'celular': 'celular'
     },
     'coordinadores': {
+        'jefe': 'jefe',  # Cambiado de 'jefe_nombre'
         'nombre': 'nombre',
-        'codigo': 'codigo_coordinador',
-        'jefe': 'jefe_nombre',
-        'telefono': 'telefono',
-        'email': 'email'
+        'ci': 'ci',
+        'expedido': 'expedido', 
+        'celular': 'celular',
+        'correo': 'correo',
+        'cargo': 'cargo'
     },
     'grupos': {
-        'nombre': 'nombre_grupo',
-        'coordinador': 'coordinador_codigo',
-        'descripcion': 'descripcion'
+        'coordinador_ci': 'coordinador_ci',  # Cambiado de 'coordinador_nombre'
+        'nombre': 'nombre'
     },
     'departamentos': {
-        'nombre': 'nombre',
-        'codigo': 'codigo'
+        'nombre': 'nombre'
     },
     'provincias': {
-        'nombre': 'nombre',
-        'codigo': 'codigo',
-        'departamento': 'departamento_codigo'
+        'departamento': 'departamento',  # Cambiado de 'departamento_nombre'
+        'nombre': 'nombre'
     },
     'municipios': {
-        'nombre': 'nombre',
-        'codigo': 'codigo',
-        'provincia': 'provincia_codigo'
+        'provincia': 'provincia',  # Cambiado de 'provincia_nombre'
+        'nombre': 'nombre'
     },
-    'asientos': {
-        'nombre': 'nombre',
-        'codigo': 'codigo',
-        'municipio': 'municipio_codigo'
+    'asientos_electorales': {  # Cambiado de 'asientos'
+        'municipio': 'municipio',  # Cambiado de 'municipio_nombre'
+        'nombre': 'nombre'
     },
     'recintos': {
+        'asiento_electoral': 'asiento_electoral',  # Cambiado de 'asiento'
         'nombre': 'nombre',
         'direccion': 'direccion',
-        'tipo': 'tipo',
-        'asiento': 'asiento_codigo',
-        'latitud': 'latitud',
-        'longitud': 'longitud'
-    },
-    'vehiculos': {
-        'placa': 'placa',
-        'marca': 'marca',
-        'modelo': 'modelo',
-        'anio': 'anio'
-    },
-    'choferes': {
-        'nombre': 'nombre',
-        'cedula': 'cedula',
-        'licencia': 'licencia',
-        'telefono': 'telefono',
-        'vehiculo': 'vehiculo_placa'
+        'distrito': 'distrito'
     },
     'operadores': {
+        'grupo': 'grupo',  # Cambiado de 'grupo_nombre'
+        'recinto': 'recinto',  # Cambiado de 'recinto_nombre'
         'nombre': 'nombre',
-        'cedula': 'cedula',
-        'telefono': 'telefono',
-        'tipo': 'tipo_operador',
-        'grupo': 'grupo_nombre',
-        'recinto': 'recinto_nombre',
-        'vehiculo': 'vehiculo_placa',
-        'fecha_inicio': 'fecha_inicio',
-        'fecha_fin': 'fecha_fin'
+        'ci': 'ci',
+        'expedido': 'expedido',
+        'celular': 'celular',
+        'correo': 'correo',
+        'cargo': 'cargo',
+        'tipo': 'tipo'  # Cambiado de 'tipo_operador'
+    },
+    'notarios': {
+        'recinto': 'recinto',  # Cambiado de 'recinto_nombre'
+        'nombre': 'nombre',
+        'ci': 'ci',
+        'expedido': 'expedido',
+        'celular': 'celular',
+        'correo': 'correo',
+        'cargo': 'cargo',
+        'tipo': 'tipo'  # Cambiado de 'tipo_notario'
+    },
+    'actas': {
+        'recinto': 'recinto',  # Cambiado de 'mesa_numero'
+        'codigo': 'codigo'
+    },
+    'cuentas': {
+        'operador': 'operador',  # Cambiado de 'operador_nombre' (ahora usa CI)
+        'user': 'user',  # Cambiado de 'usuario'
+        'password': 'password'
     }
 }
