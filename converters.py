@@ -8,7 +8,7 @@ class DataConverters:
         self.db = db_manager
     
     def _get_string_value(self, row: Dict, column_path: str, default: str = '') -> str:
-        """Obtiene un valor como string, manejando diferentes tipos de datos"""
+        """Obtiene valor como string"""
         try:
             value = row.get(column_path, default)
             if value is None:
@@ -20,7 +20,7 @@ class DataConverters:
             return default
     
     def _get_int_value(self, row: Dict, column_path: str, default: int = 0) -> int:
-        """Obtiene un valor como entero"""
+        """Obtiene valor como entero"""
         try:
             value = row.get(column_path, default)
             if value is None:
@@ -28,6 +28,18 @@ class DataConverters:
             if isinstance(value, str):
                 return int(value.strip()) if value.strip() else default
             return int(value)
+        except:
+            return default
+    
+    def _get_bool_value(self, row: Dict, column_path: str, default: bool = False) -> bool:
+        """Obtiene valor como booleano"""
+        try:
+            value = row.get(column_path, default)
+            if value is None:
+                return default
+            if isinstance(value, str):
+                return value.strip().lower() in ['1', 'true', 'si', 'sí', 'yes']
+            return bool(value)
         except:
             return default
 
@@ -125,8 +137,8 @@ class DataConverters:
         print(f"   ✅ {count} departamentos procesados")
     
     def convert_provincias(self, data: List[Dict[str, Any]]):
-        """Convierte provincias"""
-        print("🌄 Procesando provincias...")
+        """Convierte provincias con clasificación urbano/rural"""
+        print("Procesando provincias...")
         count = 0
         
         for row in data:
@@ -137,16 +149,20 @@ class DataConverters:
             depto_nombre = self._get_string_value(row, COLUMN_MAPPING['provincias']['departamento'])
             depto_id = self.db.get_id_by_field('departamento', 'nombre', depto_nombre) if depto_nombre else None
             
+            # Detectar si es urbano (Cercado) o rural
+            es_urbano = self._get_bool_value(row, COLUMN_MAPPING['provincias']['es_urbano'])
+            
             prov_data = {
                 'departamento_id': depto_id,
-                'nombre': nombre
+                'nombre': nombre,
+                'es_urbano': 1 if es_urbano else 0
             }
             
             self.db.insert_or_update('provincia', prov_data, 'nombre')
             count += 1
         
-        print(f"   ✅ {count} provincias procesadas")
-    
+        print(f"   {count} provincias procesadas")
+
     def convert_municipios(self, data: List[Dict[str, Any]]):
         """Convierte municipios"""
         print("🏘️  Procesando municipios...")
@@ -194,14 +210,12 @@ class DataConverters:
         print(f"   ✅ {count} asientos procesados")
     
     
-
-
     def convert_recintos(self, data: List[Dict[str, Any]]):
-        """Convierte recintos"""
-        print("🏫 Procesando recintos...")
-        count = 0
+        """Convierte recintos usando clave compuesta (asiento + nombre)"""
+        print("Procesando recintos...")
+        inserted = 0
+        updated = 0
         skipped = 0
-        duplicates = 0
         
         for row in data:
             nombre = self._get_string_value(row, COLUMN_MAPPING['recintos']['nombre'])
@@ -212,9 +226,12 @@ class DataConverters:
             asiento_id = self.db.get_id_by_field('asiento_electoral', 'nombre', asiento_nombre) if asiento_nombre else None
             
             if not asiento_id:
-                print(f"   ⚠️  Asiento electoral no encontrado: '{asiento_nombre}' para recinto '{nombre}'")
+                print(f"   Asiento '{asiento_nombre}' no encontrado para recinto '{nombre}'")
                 skipped += 1
                 continue
+            
+            # Verificar si ya existe (por clave compuesta)
+            existing_id = self.db.get_recinto_id_by_asiento_and_nombre(asiento_nombre, nombre)
             
             recinto_data = {
                 'asiento_id': asiento_id,
@@ -223,22 +240,15 @@ class DataConverters:
                 'distrito': self._get_int_value(row, COLUMN_MAPPING['recintos']['distrito'])
             }
             
-            # Verificar si ya existe un recinto con el mismo nombre Y asiento_id Y dirección
-            existing_id = self._check_existing_recinto(recinto_data)
-            
             if existing_id:
-                # Si existe, actualizar
                 self.db.update_record('recinto', recinto_data, existing_id)
-                count += 1
+                updated += 1
             else:
-                # Si no existe, insertar nuevo
                 self.db.insert_record('recinto', recinto_data)
-                count += 1
+                inserted += 1
         
-        print(f"   ✅ {count} recintos procesados")
-        if skipped > 0:
-            print(f"   ⚠️  {skipped} recintos omitidos (asiento no encontrado)")
-
+        print(f"   {inserted} nuevos, {updated} actualizados, {skipped} omitidos")
+  
     def _check_existing_recinto(self, recinto_data: Dict[str, Any]) -> Optional[int]:
         """Verifica si ya existe un recinto con los mismos datos clave"""
         with self.db.get_connection() as conn:
@@ -253,21 +263,29 @@ class DataConverters:
     
     
     def convert_operadores(self, data: List[Dict[str, Any]]):
-        """Convierte operadores"""
-        print("👷 Procesando operadores...")
+        """Convierte operadores usando asiento_electoral + recinto"""
+        print("Procesando operadores...")
         count = 0
+        errors = 0
         
         for row in data:
             ci = self._get_string_value(row, COLUMN_MAPPING['operadores']['ci'])
             if not ci:
                 continue
             
-            # Buscar IDs relacionados
+            # Buscar grupo
             grupo_nombre = self._get_string_value(row, COLUMN_MAPPING['operadores']['grupo'])
             grupo_id = self.db.get_id_by_field('grupo', 'nombre', grupo_nombre) if grupo_nombre else None
             
+            # Buscar recinto por clave compuesta
+            asiento_nombre = self._get_string_value(row, COLUMN_MAPPING['operadores']['asiento_electoral'])
             recinto_nombre = self._get_string_value(row, COLUMN_MAPPING['operadores']['recinto'])
-            recinto_id = self.db.get_id_by_field('recinto', 'nombre', recinto_nombre) if recinto_nombre else None
+            recinto_id = self.db.get_recinto_id_by_asiento_and_nombre(asiento_nombre, recinto_nombre)
+            
+            if not recinto_id:
+                print(f"   Recinto '{recinto_nombre}' en '{asiento_nombre}' no encontrado para operador CI {ci}")
+                errors += 1
+                continue
             
             operador_data = {
                 'grupo_id': grupo_id,
@@ -277,27 +295,35 @@ class DataConverters:
                 'expedido': self._get_string_value(row, COLUMN_MAPPING['operadores']['expedido']),
                 'celular': self._get_string_value(row, COLUMN_MAPPING['operadores']['celular']),
                 'correo': self._get_string_value(row, COLUMN_MAPPING['operadores']['correo']),
-                'cargo': self._get_string_value(row, COLUMN_MAPPING['operadores']['cargo']),
-                'tipo': self._get_string_value(row, COLUMN_MAPPING['operadores']['tipo'], 'urbano').lower()
+                'cargo': self._get_string_value(row, COLUMN_MAPPING['operadores']['cargo'])
             }
             
             self.db.insert_or_update('operador', operador_data, 'ci')
             count += 1
         
-        print(f"   ✅ {count} operadores procesados")
-    
+        print(f"   {count} operadores procesados, {errors} errores")
+
+
+
     def convert_notarios(self, data: List[Dict[str, Any]]):
-        """Convierte notarios"""
-        print("📝 Procesando notarios...")
+        """Convierte notarios usando asiento_electoral + recinto"""
+        print("Procesando notarios...")
         count = 0
+        errors = 0
         
         for row in data:
             ci = self._get_string_value(row, COLUMN_MAPPING['notarios']['ci'])
             if not ci:
                 continue
             
+            asiento_nombre = self._get_string_value(row, COLUMN_MAPPING['notarios']['asiento_electoral'])
             recinto_nombre = self._get_string_value(row, COLUMN_MAPPING['notarios']['recinto'])
-            recinto_id = self.db.get_id_by_field('recinto', 'nombre', recinto_nombre) if recinto_nombre else None
+            recinto_id = self.db.get_recinto_id_by_asiento_and_nombre(asiento_nombre, recinto_nombre)
+            
+            if not recinto_id:
+                print(f"   Recinto '{recinto_nombre}' en '{asiento_nombre}' no encontrado para notario CI {ci}")
+                errors += 1
+                continue
             
             notario_data = {
                 'recinto_id': recinto_id,
@@ -306,62 +332,97 @@ class DataConverters:
                 'expedido': self._get_string_value(row, COLUMN_MAPPING['notarios']['expedido']),
                 'celular': self._get_string_value(row, COLUMN_MAPPING['notarios']['celular']),
                 'correo': self._get_string_value(row, COLUMN_MAPPING['notarios']['correo']),
-                'cargo': self._get_string_value(row, COLUMN_MAPPING['notarios']['cargo']),
-                'tipo': self._get_string_value(row, COLUMN_MAPPING['notarios']['tipo'], 'urbano').lower()
+                'cargo': self._get_string_value(row, COLUMN_MAPPING['notarios']['cargo'])
             }
             
             self.db.insert_or_update('notario', notario_data, 'ci')
             count += 1
         
-        print(f"   ✅ {count} notarios procesados")
-    
+        print(f"   {count} notarios procesados, {errors} errores")
+
+
     def convert_actas(self, data: List[Dict[str, Any]]):
-        """Convierte actas SOLO con recinto"""
-        print("📄 Procesando actas...")
-        count = 0
+        """Convierte actas usando asiento_electoral + recinto"""
+        print("Procesando actas...")
+        total_actas = 0
+        recintos_procesados = 0
         skipped = 0
         
-        # ✅ DEBUG: Mostrar primeros registros
-        #print("   🔍 DEBUG - Primeros registros:")
-        for i, row in enumerate(data[:3]):  # Mostrar solo 3
-            recinto_valor = self._get_string_value(row, COLUMN_MAPPING['actas']['recinto'])
-            codigo_valor = self._get_string_value(row, COLUMN_MAPPING['actas']['codigo'])
-            #print(f"      Registro {i+1}: recinto='{recinto_valor}', codigo='{codigo_valor}'")
-            #print(f"      Campos disponibles: {list(row.keys())}")
-        
         for row in data:
-            codigo = self._get_string_value(row, COLUMN_MAPPING['actas']['codigo'])
-            if not codigo:
-                continue
-            
-            # Buscar SOLO recinto_id
+            asiento_nombre = self._get_string_value(row, COLUMN_MAPPING['actas']['asiento_electoral'])
             recinto_nombre = self._get_string_value(row, COLUMN_MAPPING['actas']['recinto'])
+            codigos_str = self._get_string_value(row, COLUMN_MAPPING['actas']['codigos'], '')
             
-            # ✅ DEBUG: Mostrar qué está buscando
-            # print(f"   🔍 Buscando recinto: '{recinto_nombre}'")
-            
-            recinto_id = self.db.get_id_by_field('recinto', 'nombre', recinto_nombre)
-            
-            if not recinto_id:
-                print(f"   ⚠️  Acta '{codigo}' omitida - recinto '{recinto_nombre}' no encontrado")
+            if not codigos_str:
                 skipped += 1
                 continue
             
-            acta_data = {
-                'recinto_id': recinto_id,
-                'codigo': codigo
-            }
+            recinto_id = self.db.get_recinto_id_by_asiento_and_nombre(asiento_nombre, recinto_nombre)
+            if not recinto_id:
+                print(f"   Recinto '{recinto_nombre}' en '{asiento_nombre}' no encontrado")
+                skipped += 1
+                continue
             
-            self.db.insert_or_update('acta', acta_data, 'codigo')
-            count += 1
+            codigos = self._separar_codigos(codigos_str)
+            
+            for codigo in codigos:
+                if not codigo or not self._validar_codigo_acta(codigo):
+                    continue
+                    
+                acta_data = {
+                    'recinto_id': recinto_id,
+                    'codigo': codigo
+                }
+                
+                try:
+                    self.db.insert_or_update('acta', acta_data, 'codigo')
+                    total_actas
+                    total_actas += 1
+                except Exception as e:
+                    print(f"   Error insertando acta '{codigo}': {e}")
+            
+            recintos_procesados += 1
         
-        print(f"   ✅ {count} actas procesadas")
-        if skipped > 0:
-            print(f"   ⚠️  {skipped} actas omitidas (recinto no encontrado)")
-
+        print(f"   {total_actas} actas en {recintos_procesados} recintos, {skipped} omitidos")
+    
+    def _separar_codigos(self, codigos_str: str) -> List[str]:
+        """Separa códigos por diferentes delimitadores"""
+        if not codigos_str or not codigos_str.strip():
+            return []
+        
+        codigos_limpios = codigos_str.strip()
+        separadores = [',', ';', '|', '\t', ' ']
+        
+        for sep in separadores:
+            if sep in codigos_limpios:
+                codigos = [c.strip() for c in codigos_limpios.split(sep) if c.strip()]
+                if len(codigos) > 1:
+                    return codigos
+        
+        return [codigos_limpios] if codigos_limpios else []
+    
+    def _validar_codigo_acta(self, codigo: str) -> bool:
+        """Valida formato de código de acta"""
+        if not codigo or not isinstance(codigo, str):
+            return False
+        
+        codigo_limpio = codigo.strip()
+        
+        if len(codigo_limpio) < 3 or len(codigo_limpio) > 50:
+            return False
+        
+        if not any(c.isalnum() for c in codigo_limpio):
+            return False
+        
+        caracteres_peligrosos = ['<', '>', '"', "'", '\\', '/', '?', '*']
+        if any(caracter in codigo_limpio for caracter in caracteres_peligrosos):
+            return False
+        
+        return True
+    
     def convert_cuentas(self, data: List[Dict[str, Any]]):
         """Convierte cuentas de usuario"""
-        print("👤 Procesando cuentas...")
+        print("Procesando cuentas...")
         count = 0
         
         for row in data:
@@ -381,4 +442,10 @@ class DataConverters:
             self.db.insert_or_update('cuenta', cuenta_data, 'user')
             count += 1
         
-        print(f"   ✅ {count} cuentas procesadas")
+        print(f"   {count} cuentas procesadas")
+    
+    # Métodos convert_jefes, convert_coordinadores, convert_grupos, 
+    # convert_departamentos, convert_municipios, convert_asientos_electorales
+    # permanecen igual que en tu versión original
+
+

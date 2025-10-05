@@ -1,4 +1,7 @@
-# config.py - Configuraciones centralizadas
+# ============================================
+# config.py - CONFIGURACIÓN ACTUALIZADA
+# ============================================
+
 import os
 
 # === CONFIGURACIÓN GOOGLE SHEETS ===
@@ -16,7 +19,7 @@ SHEET_NAMES = {
     'departamentos': 'Departamentos',
     'provincias': 'Provincias',
     'municipios': 'Municipios',
-    'asientos_electorales': 'Asientos_Electorales',  # Cambiado a plural
+    'asientos_electorales': 'Asientos_Electorales',
     'recintos': 'Recintos',
     'operadores': 'Operadores',
     'notarios': 'Notarios',
@@ -32,7 +35,7 @@ COLUMN_MAPPING = {
         'celular': 'celular'
     },
     'coordinadores': {
-        'jefe': 'jefe',  # Cambiado de 'jefe_nombre'
+        'jefe': 'jefe',
         'nombre': 'nombre',
         'ci': 'ci',
         'expedido': 'expedido', 
@@ -41,58 +44,65 @@ COLUMN_MAPPING = {
         'cargo': 'cargo'
     },
     'grupos': {
-        'coordinador_ci': 'coordinador_ci',  # Cambiado de 'coordinador_nombre'
+        'coordinador_ci': 'coordinador_ci',
         'nombre': 'nombre'
     },
     'departamentos': {
         'nombre': 'nombre'
     },
     'provincias': {
-        'departamento': 'departamento',  # Cambiado de 'departamento_nombre'
-        'nombre': 'nombre'
+        'departamento': 'departamento',
+        'nombre': 'nombre',
+        'es_urbano': 'es_urbano'  # NUEVO: 1=urbano, 0=rural
     },
     'municipios': {
-        'provincia': 'provincia',  # Cambiado de 'provincia_nombre'
+        'provincia': 'provincia',
         'nombre': 'nombre'
     },
-    'asientos_electorales': {  # Cambiado de 'asientos'
-        'municipio': 'municipio',  # Cambiado de 'municipio_nombre'
+    'asientos_electorales': {
+        'municipio': 'municipio',
         'nombre': 'nombre'
     },
     'recintos': {
-        'asiento_electoral': 'asiento_electoral',  # Cambiado de 'asiento'
+        'departamento': 'departamento',      # NUEVO
+        'provincia': 'provincia',            # NUEVO
+        'municipio': 'municipio',            # NUEVO
+        'asiento_electoral': 'asiento_electoral',
         'nombre': 'nombre',
         'direccion': 'direccion',
         'distrito': 'distrito'
     },
     'operadores': {
-        'grupo': 'grupo',  # Cambiado de 'grupo_nombre'
-        'recinto': 'recinto',  # Cambiado de 'recinto_nombre'
+        'grupo': 'grupo',
+        'asiento_electoral': 'asiento_electoral',  # NUEVO
+        'recinto': 'recinto',
         'nombre': 'nombre',
         'ci': 'ci',
         'expedido': 'expedido',
         'celular': 'celular',
         'correo': 'correo',
-        'cargo': 'cargo',
-        'tipo': 'tipo'  # Cambiado de 'tipo_operador'
+        'cargo': 'cargo'
+        # ELIMINADO: 'tipo' (se calcula automáticamente)
     },
     'notarios': {
-        'recinto': 'recinto',  # Cambiado de 'recinto_nombre'
+        'asiento_electoral': 'asiento_electoral',  # NUEVO
+        'recinto': 'recinto',
         'nombre': 'nombre',
         'ci': 'ci',
         'expedido': 'expedido',
         'celular': 'celular',
         'correo': 'correo',
-        'cargo': 'cargo',
-        'tipo': 'tipo'  # Cambiado de 'tipo_notario'
+        'cargo': 'cargo'
+        # ELIMINADO: 'tipo' (se calcula automáticamente)
     },
     'actas': {
-        'recinto': 'recinto',  # Cambiado de 'mesa_numero'
-        'codigo': 'codigo'
+        'asiento_electoral': 'asiento_electoral',  # NUEVO
+        'recinto': 'recinto',
+        'codigos': 'codigos'
     },
     'cuentas': {
-        'operador': 'operador',  # Cambiado de 'operador_nombre' (ahora usa CI)
-        'user': 'user',  # Cambiado de 'usuario'
+        'operador': 'operador',
+        'user': 'user',
         'password': 'password'
     }
 }
