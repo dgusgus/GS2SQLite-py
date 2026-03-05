@@ -342,54 +342,83 @@ class DataConverters:
 
 
     def convert_actas(self, data: List[Dict[str, Any]]):
-        """Convierte actas usando asiento_electoral + recinto"""
-        print("Procesando actas...")
+        """
+        🆕 Convierte actas CON asignación específica a operadores
+        
+        Cada acta ahora se asigna directamente a un operador mediante su CI,
+        evitando que todas las actas del mismo recinto se asignen al primer operador.
+        """
+        print("📄 Procesando actas...")
         total_actas = 0
         recintos_procesados = 0
-        skipped = 0
+        errores = 0
         
         for row in data:
+            # Obtener datos del Google Sheet
             asiento_nombre = self._get_string_value(row, COLUMN_MAPPING['actas']['asiento_electoral'])
             recinto_nombre = self._get_string_value(row, COLUMN_MAPPING['actas']['recinto'])
+            operador_ci = self._get_string_value(row, COLUMN_MAPPING['actas']['operador_ci'])  # 🆕 NUEVO
             codigos_str = self._get_string_value(row, COLUMN_MAPPING['actas']['codigos'], '')
             
+            # Validar datos requeridos
             if not codigos_str:
-                skipped += 1
+                print(f"   ⚠️ Fila sin códigos, omitida")
+                errores += 1
                 continue
             
+            if not operador_ci:
+                print(f"   ⚠️ Fila sin operador_ci, omitida (recinto: {recinto_nombre})")
+                errores += 1
+                continue
+            
+            # Buscar recinto
             recinto_id = self.db.get_recinto_id_by_asiento_and_nombre(asiento_nombre, recinto_nombre)
             if not recinto_id:
-                print(f"   Recinto '{recinto_nombre}' en '{asiento_nombre}' no encontrado")
-                skipped += 1
+                print(f"   ⚠️ Recinto '{recinto_nombre}' en '{asiento_nombre}' no encontrado")
+                errores += 1
                 continue
             
+            # 🆕 Buscar operador por CI
+            operador_id = self.db.get_id_by_field('operador', 'ci', operador_ci)
+            if not operador_id:
+                print(f"   ⚠️ Operador CI '{operador_ci}' no encontrado (recinto: {recinto_nombre})")
+                errores += 1
+                continue
+            
+            # Separar códigos (puede ser: "4000011, 4000012, 4000013" o "4000011")
             codigos = self._separar_codigos(codigos_str)
             
+            actas_insertadas = 0
             for codigo in codigos:
                 if not codigo or not self._validar_codigo_acta(codigo):
                     continue
-                    
+                
+                # 🆕 Datos con operador_id
                 acta_data = {
                     'recinto_id': recinto_id,
+                    'operador_id': operador_id,  # 🆕 ASIGNACIÓN ESPECÍFICA
                     'codigo': codigo
                 }
                 
                 try:
                     self.db.insert_or_update('acta', acta_data, 'codigo')
-                    total_actas
+                    actas_insertadas += 1
                     total_actas += 1
                 except Exception as e:
-                    print(f"   Error insertando acta '{codigo}': {e}")
+                    print(f"   ❌ Error insertando acta '{codigo}': {e}")
+                    errores += 1
             
-            recintos_procesados += 1
+            if actas_insertadas > 0:
+                recintos_procesados += 1
+                print(f"   ✅ {actas_insertadas} actas → Operador CI {operador_ci} (Recinto: {recinto_nombre})")
         
-        print(f"   {total_actas} actas en {recintos_procesados} recintos, {skipped} omitidos")
+        print(f"   📊 RESUMEN: {total_actas} actas en {recintos_procesados} asignaciones, {errores} errores")
     
     def _separar_codigos(self, codigos_str: str) -> List[str]:
         """Separa códigos por diferentes delimitadores"""
         if not codigos_str or not codigos_str.strip():
             return []
-        
+         
         codigos_limpios = codigos_str.strip()
         separadores = [',', ';', '|', '\t', ' ']
         
@@ -400,7 +429,7 @@ class DataConverters:
                     return codigos
         
         return [codigos_limpios] if codigos_limpios else []
-    
+
     def _validar_codigo_acta(self, codigo: str) -> bool:
         """Valida formato de código de acta"""
         if not codigo or not isinstance(codigo, str):
@@ -418,8 +447,7 @@ class DataConverters:
         if any(caracter in codigo_limpio for caracter in caracteres_peligrosos):
             return False
         
-        return True
-    
+        return True    
     def convert_cuentas(self, data: List[Dict[str, Any]]):
         """Convierte cuentas de usuario"""
         print("Procesando cuentas...")

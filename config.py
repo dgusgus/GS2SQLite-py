@@ -53,7 +53,7 @@ COLUMN_MAPPING = {
     'provincias': {
         'departamento': 'departamento',
         'nombre': 'nombre',
-        'es_urbano': 'es_urbano'  # NUEVO: 1=urbano, 0=rural
+        'es_urbano': 'es_urbano'
     },
     'municipios': {
         'provincia': 'provincia',
@@ -64,9 +64,9 @@ COLUMN_MAPPING = {
         'nombre': 'nombre'
     },
     'recintos': {
-        'departamento': 'departamento',      # NUEVO
-        'provincia': 'provincia',            # NUEVO
-        'municipio': 'municipio',            # NUEVO
+        'departamento': 'departamento',
+        'provincia': 'provincia',
+        'municipio': 'municipio',
         'asiento_electoral': 'asiento_electoral',
         'nombre': 'nombre',
         'direccion': 'direccion',
@@ -74,7 +74,7 @@ COLUMN_MAPPING = {
     },
     'operadores': {
         'grupo': 'grupo',
-        'asiento_electoral': 'asiento_electoral',  # NUEVO
+        'asiento_electoral': 'asiento_electoral',
         'recinto': 'recinto',
         'nombre': 'nombre',
         'ci': 'ci',
@@ -82,10 +82,9 @@ COLUMN_MAPPING = {
         'celular': 'celular',
         'correo': 'correo',
         'cargo': 'cargo'
-        # ELIMINADO: 'tipo' (se calcula automáticamente)
     },
     'notarios': {
-        'asiento_electoral': 'asiento_electoral',  # NUEVO
+        'asiento_electoral': 'asiento_electoral',
         'recinto': 'recinto',
         'nombre': 'nombre',
         'ci': 'ci',
@@ -93,11 +92,11 @@ COLUMN_MAPPING = {
         'celular': 'celular',
         'correo': 'correo',
         'cargo': 'cargo'
-        # ELIMINADO: 'tipo' (se calcula automáticamente)
     },
     'actas': {
-        'asiento_electoral': 'asiento_electoral',  # NUEVO
+        'asiento_electoral': 'asiento_electoral',
         'recinto': 'recinto',
+        'operador_ci': 'operador_ci',  # 🆕 NUEVA COLUMNA
         'codigos': 'codigos'
     },
     'cuentas': {

@@ -1,5 +1,5 @@
 # ============================================
-# database.py - ESQUEMA MEJORADO
+# database.py - ESQUEMA ACTUALIZADO CON OPERADOR EN ACTAS
 # ============================================
 
 import sqlite3
@@ -99,13 +99,12 @@ class DatabaseManager:
                     direccion TEXT,
                     distrito INTEGER DEFAULT 0,
                     asiento_id INTEGER NOT NULL,
-                    -- Clave compuesta: asiento + nombre es único
                     UNIQUE(asiento_id, nombre),
                     FOREIGN KEY (asiento_id) REFERENCES asiento_electoral(id)
                 )
             """,
 
-            # PERSONAS (sin campo 'tipo')
+            # PERSONAS
             'operador': """
                 CREATE TABLE IF NOT EXISTS operador (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -136,12 +135,15 @@ class DatabaseManager:
                 )
             """,
             
+            # 🆕 ACTAS CON OPERADOR
             'acta': """
                 CREATE TABLE IF NOT EXISTS acta (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     codigo TEXT NOT NULL UNIQUE,
                     recinto_id INTEGER NOT NULL,
-                    FOREIGN KEY (recinto_id) REFERENCES recinto(id)
+                    operador_id INTEGER NOT NULL,
+                    FOREIGN KEY (recinto_id) REFERENCES recinto(id),
+                    FOREIGN KEY (operador_id) REFERENCES operador(id)
                 )
             """,
 
@@ -205,19 +207,43 @@ class DatabaseManager:
                 JOIN municipio m ON a.municipio_id = m.id
                 JOIN provincia p ON m.provincia_id = p.id
                 JOIN departamento d ON p.departamento_id = d.id
+            """,
+            
+            # 🆕 VISTA PARA ACTAS CON OPERADORES
+            'v_actas_completo': """
+                CREATE VIEW IF NOT EXISTS v_actas_completo AS
+                SELECT 
+                    ac.id,
+                    ac.codigo,
+                    o.nombre as operador,
+                    o.ci as operador_ci,
+                    o.celular as operador_celular,
+                    r.nombre as recinto,
+                    r.direccion as recinto_direccion,
+                    a.nombre as asiento_electoral,
+                    m.nombre as municipio,
+                    p.nombre as provincia,
+                    d.nombre as departamento
+                FROM acta ac
+                JOIN operador o ON ac.operador_id = o.id
+                JOIN recinto r ON ac.recinto_id = r.id
+                JOIN asiento_electoral a ON r.asiento_id = a.id
+                JOIN municipio m ON a.municipio_id = m.id
+                JOIN provincia p ON m.provincia_id = p.id
+                JOIN departamento d ON p.departamento_id = d.id
             """
         }
         
         with self.get_connection() as conn:
             for table_name, sql in tables_sql.items():
                 conn.execute(sql)
-                print(f"Tabla '{table_name}' OK")
+                print(f"✅ Tabla '{table_name}' creada/verificada")
             
             for view_name, sql in views_sql.items():
                 conn.execute(sql)
-                print(f"Vista '{view_name}' OK")
+                print(f"✅ Vista '{view_name}' creada/verificada")
         
-        print("Esquema de base de datos listo")
+        print("✅ Esquema de base de datos listo")
     
     def insert_or_update(self, table: str, data: Dict[str, Any], unique_field: str) -> int:
         """Inserta o actualiza basado en campo único"""
@@ -252,10 +278,10 @@ class DatabaseManager:
                     return cursor.lastrowid
                     
             except sqlite3.IntegrityError as e:
-                print(f"   Error de integridad en {table}: {e}")
+                print(f"   ⚠️ Error de integridad en {table}: {e}")
                 raise
             except sqlite3.Error as e:
-                print(f"   Error en {table}: {e}")
+                print(f"   ⚠️ Error en {table}: {e}")
                 raise
     
     def get_recinto_id_by_asiento_and_nombre(self, asiento_nombre: str, recinto_nombre: str) -> Optional[int]:
