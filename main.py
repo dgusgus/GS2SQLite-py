@@ -1,4 +1,4 @@
-# main.py - Programa principal
+# main.py - Orquestador principal (esquema simplificado)
 import argparse
 from datetime import datetime
 from database import DatabaseManager
@@ -8,35 +8,82 @@ from config import SHEET_NAMES
 
 
 def show_stats(db: DatabaseManager):
-    """Muestra estadísticas detalladas"""
     print("\n" + "=" * 60)
     print("📊 ESTADÍSTICAS DE LA BASE DE DATOS")
     print("=" * 60)
 
     stats = db.get_stats()
-    total = sum(stats.values())
 
-    for table, count in stats.items():
-        emoji = {
-            'jefe': '👔',
-            'coordinador': '👥',
-            'grupo': '🏢',
-            'departamento': '🏛️',
-            'provincia': '🌄',
-            'municipio': '🏘️',
-            'asiento_electoral': '🗳️',
-            'recinto': '🏫',
-            'operador': '👷',
-            'notario': '📜',
-            'acta': '📄',
-            'cuenta': '🔑'
-        }.get(table, '📋')
+    labels = {
+        'jefe':                ('👔', 'Jefes'),
+        'coordinador':         ('👥', 'Coordinadores'),
+        'grupo':               ('🏢', 'Grupos'),
+        'departamento':        ('🏛️ ', 'Departamentos'),
+        'provincia':           ('🌄', 'Provincias'),
+        'municipio':           ('🏘️ ', 'Municipios'),
+        'asiento_electoral':   ('🗳️ ', 'Asientos Electorales'),
+        'recinto':             ('🏫', 'Recintos'),
+        'persona':             ('👷', 'Personas (total)'),
+        'operadores':          ('  ↳ 🟢', 'Operadores'),
+        'notarios':            ('  ↳ 📜', 'Notarios'),
+        'cuentas':             ('  ↳ 🔑', 'Con cuenta de acceso'),
+        'acta':                ('📄', 'Actas'),
+    }
 
-        print(f"{emoji} {table.replace('_', ' ').title().ljust(20)}: {count:>6} registros")
+    total_base = sum(v for k, v in stats.items()
+                     if k in ['jefe','coordinador','grupo','departamento',
+                               'provincia','municipio','asiento_electoral',
+                               'recinto','persona','acta'])
+
+    for key, (emoji, label) in labels.items():
+        count = stats.get(key, 0)
+        print(f"{emoji} {label.ljust(25)}: {count:>6} registros")
 
     print("=" * 60)
-    print(f"🎯 TOTAL: {total:>6} registros")
+    print(f"🎯 TOTAL (tablas principales): {total_base:>6} registros")
     print("=" * 60)
+
+
+def run_import(db: DatabaseManager):
+    """Ejecuta la importación completa desde Google Sheets"""
+    sheets = SheetsManager()
+    converters = DataConverters(db)
+
+    # ── Geografía y organización (orden por dependencias) ────────────
+    geo_org_order = [
+        ('jefes',                converters.convert_jefes),
+        ('coordinadores',        converters.convert_coordinadores),
+        ('grupos',               converters.convert_grupos),
+        ('departamentos',        converters.convert_departamentos),
+        ('provincias',           converters.convert_provincias),
+        ('municipios',           converters.convert_municipios),
+        ('asientos_electorales', converters.convert_asientos_electorales),
+        ('recintos',             converters.convert_recintos),
+    ]
+
+    for data_type, converter_func in geo_org_order:
+        sheet_name = SHEET_NAMES[data_type]
+        print(f"📖 Leyendo '{sheet_name}'...")
+        data = sheets.get_sheet_data(sheet_name)
+        if data:
+            converter_func(data)
+        else:
+            print(f"   ⚠️  Sin datos en '{sheet_name}'")
+
+    # ── Personas: operadores + notarios + cuentas juntos ─────────────
+    print(f"📖 Leyendo personas (Operadores / Notarios / Cuentas)...")
+    operadores_data = sheets.get_sheet_data(SHEET_NAMES['operadores'])
+    notarios_data   = sheets.get_sheet_data(SHEET_NAMES['notarios'])
+    cuentas_data    = sheets.get_sheet_data(SHEET_NAMES['cuentas'])
+    converters.convert_personas(operadores_data, notarios_data, cuentas_data)
+
+    # ── Actas ────────────────────────────────────────────────────────
+    print(f"📖 Leyendo '{SHEET_NAMES['actas']}'...")
+    actas_data = sheets.get_sheet_data(SHEET_NAMES['actas'])
+    if actas_data:
+        converters.convert_actas(actas_data)
+    else:
+        print(f"   ⚠️  Sin datos en '{SHEET_NAMES['actas']}'")
 
 
 def main():
@@ -47,51 +94,20 @@ def main():
 
     parser = argparse.ArgumentParser(description="Convierte datos de Google Sheets a SQLite")
     parser.add_argument('comando', nargs='?', default='todo',
-                       choices=['crear', 'importar', 'stats', 'todo'],
-                       help='Comando a ejecutar')
-
+                        choices=['crear', 'importar', 'stats', 'todo'],
+                        help='Comando a ejecutar')
     args = parser.parse_args()
 
     try:
-        # Inicializar base de datos
         db = DatabaseManager()
 
         if args.comando == 'crear':
-            print("🏗️  Creando estructura de base de datos...")
+            print("🏗️  Creando estructura...")
             db.create_schema()
-            print("✅ Estructura creada")
 
         elif args.comando == 'importar':
-            print("📥 Importando datos desde Google Sheets...")
-            sheets = SheetsManager()
-            converters = DataConverters(db)
-
-            # Orden de importación (importante por dependencias)
-            import_order = [
-                ('jefes', converters.convert_jefes),
-                ('coordinadores', converters.convert_coordinadores),
-                ('grupos', converters.convert_grupos),
-                ('departamentos', converters.convert_departamentos),
-                ('provincias', converters.convert_provincias),
-                ('municipios', converters.convert_municipios),
-                ('asientos_electorales', converters.convert_asientos_electorales),
-                ('recintos', converters.convert_recintos),
-                ('operadores', converters.convert_operadores),
-                ('notarios', converters.convert_notarios),
-                ('actas', converters.convert_actas),
-                ('cuentas', converters.convert_cuentas),
-            ]
-
-            for data_type, converter_func in import_order:
-                sheet_name = SHEET_NAMES[data_type]
-                print(f"📖 Leyendo hoja: {sheet_name}...")
-                data = sheets.get_sheet_data(sheet_name)
-                if data:
-                    print(f"   📊 Procesando {len(data)} registros...")
-                    converter_func(data)
-                else:
-                    print(f"   ⚠️  No se encontraron datos en {sheet_name}")
-
+            print("📥 Importando datos...")
+            run_import(db)
             print("✅ Importación completada")
 
         elif args.comando == 'stats':
@@ -100,63 +116,22 @@ def main():
         else:  # 'todo'
             print("🏗️  Creando estructura...")
             db.create_schema()
-
             print("\n📥 Importando datos...")
-            sheets = SheetsManager()
-            converters = DataConverters(db)
-
-            import_order = [
-                ('jefes', converters.convert_jefes),
-                ('coordinadores', converters.convert_coordinadores),
-                ('grupos', converters.convert_grupos),
-                ('departamentos', converters.convert_departamentos),
-                ('provincias', converters.convert_provincias),
-                ('municipios', converters.convert_municipios),
-                ('asientos_electorales', converters.convert_asientos_electorales),
-                ('recintos', converters.convert_recintos),
-                ('operadores', converters.convert_operadores),
-                ('notarios', converters.convert_notarios),
-                ('actas', converters.convert_actas),
-                ('cuentas', converters.convert_cuentas),
-            ]
-
-            for data_type, converter_func in import_order:
-                sheet_name = SHEET_NAMES[data_type]
-                print(f"📖 Leyendo hoja: {sheet_name}...")
-                data = sheets.get_sheet_data(sheet_name)
-                if data:
-                    print(f"   📊 Procesando {len(data)} registros...")
-                    converter_func(data)
-                else:
-                    print(f"   ⚠️  No se encontraron datos en {sheet_name}")
-
-            print("\n📊 Mostrando estadísticas...")
+            run_import(db)
+            print()
             show_stats(db)
 
         print(f"\n🎉 Proceso completado exitosamente!")
-        print(f"💾 Base de datos guardada en: {db.db_path}")
+        print(f"💾 Base de datos: {db.db_path}")
 
     except FileNotFoundError as e:
         print(f"❌ Archivo no encontrado: {e}")
-        print("\n💡 SOLUCIÓN:")
-        print("   1. Coloca 'generador-docs-31f4b831a196.json' en esta carpeta")
-        print("   2. Verifica que tengas acceso al Google Sheet")
-
-    except KeyError as e:
-        print(f"❌ Error de configuración: {e}")
-        print("\n💡 SOLUCIÓN:")
-        print("   1. Verifica que SHEET_NAMES en config.py coincida con los nombres reales de las hojas")
-        print("   2. Revisa que todas las hojas necesarias existan en el Google Sheet")
+        print("   Coloca 'generador-docs-31f4b831a196.json' en esta carpeta")
 
     except Exception as e:
         print(f"❌ Error: {e}")
         import traceback
         traceback.print_exc()
-        print("\n💡 Si el problema persiste:")
-        print("   1. Verifica tu conexión a internet")
-        print("   2. Revisa que las credenciales sean válidas")
-        print("   3. Comprueba los permisos del Google Sheet")
-        print("   4. Verifica que los nombres de columnas coincidan con COLUMN_MAPPING")
 
 
 if __name__ == "__main__":

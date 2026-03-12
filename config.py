@@ -1,107 +1,107 @@
 # ============================================
-# config.py - CONFIGURACIÓN ACTUALIZADA
+# config.py - ACTUALIZADO PARA ESQUEMA SIMPLIFICADO
 # ============================================
 
-import os
-
-# === CONFIGURACIÓN GOOGLE SHEETS ===
-SPREADSHEET_ID = "1ehySw2tVI1l8INo4fgE7kEGFd0Kb2miPs7vCqsFZC8I"
+# === GOOGLE SHEETS ===
+SPREADSHEET_ID  = "1ehySw2tVI1l8INo4fgE7kEGFd0Kb2miPs7vCqsFZC8I"
 CREDENTIALS_FILE = "generador-docs-31f4b831a196.json"
 
-# === CONFIGURACIÓN BASE DE DATOS ===
+# === BASE DE DATOS ===
 DATABASE_PATH = "../database/operadores.db"
 
-# === MAPEO DE HOJAS GOOGLE SHEETS ===
+# === HOJAS DEL GOOGLE SHEET ===
 SHEET_NAMES = {
-    'jefes': 'Jefes',
-    'coordinadores': 'Coordinadores', 
-    'grupos': 'Grupos',
-    'departamentos': 'Departamentos',
-    'provincias': 'Provincias',
-    'municipios': 'Municipios',
+    'jefes':                'Jefes',
+    'coordinadores':        'Coordinadores',
+    'grupos':               'Grupos',
+    'departamentos':        'Departamentos',
+    'provincias':           'Provincias',
+    'municipios':           'Municipios',
     'asientos_electorales': 'Asientos_Electorales',
-    'recintos': 'Recintos',
-    'operadores': 'Operadores',
-    'notarios': 'Notarios',
-    'actas': 'Actas',
-    'cuentas': 'Cuentas'
+    'recintos':             'Recintos',
+    'operadores':           'Operadores',
+    'notarios':             'Notarios',
+    'actas':                'Actas',
+    'cuentas':              'Cuentas',   # se fusiona en persona, hoja sigue existiendo
 }
 
-# === MAPEO DE COLUMNAS ACTUALIZADO ===
+# === MAPEO DE COLUMNAS ===
 COLUMN_MAPPING = {
     'jefes': {
-        'nombre': 'nombre',
-        'cargo': 'cargo',
-        'celular': 'celular'
+        'nombre':  'nombre',
+        'cargo':   'cargo',
+        'celular': 'celular',
     },
     'coordinadores': {
-        'jefe': 'jefe',
-        'nombre': 'nombre',
-        'ci': 'ci',
-        'expedido': 'expedido', 
-        'celular': 'celular',
-        'correo': 'correo',
-        'cargo': 'cargo'
+        'jefe':     'jefe',
+        'nombre':   'nombre',
+        'ci':       'ci',
+        'expedido': 'expedido',
+        'celular':  'celular',
+        'correo':   'correo',
+        'cargo':    'cargo',
     },
     'grupos': {
         'coordinador_ci': 'coordinador_ci',
-        'nombre': 'nombre'
+        'nombre':         'nombre',
     },
     'departamentos': {
-        'nombre': 'nombre'
+        'nombre': 'nombre',
     },
     'provincias': {
         'departamento': 'departamento',
-        'nombre': 'nombre',
-        'es_urbano': 'es_urbano'
+        'nombre':       'nombre',
+        'es_urbano':    'es_urbano',
     },
     'municipios': {
         'provincia': 'provincia',
-        'nombre': 'nombre'
+        'nombre':    'nombre',
     },
     'asientos_electorales': {
         'municipio': 'municipio',
-        'nombre': 'nombre'
+        'nombre':    'nombre',
     },
     'recintos': {
-        'departamento': 'departamento',
-        'provincia': 'provincia',
-        'municipio': 'municipio',
+        'departamento':      'departamento',
+        'provincia':         'provincia',
+        'municipio':         'municipio',
         'asiento_electoral': 'asiento_electoral',
-        'nombre': 'nombre',
-        'direccion': 'direccion',
-        'distrito': 'distrito'
+        'nombre':            'nombre',
+        'direccion':         'direccion',
+        'distrito':          'distrito',
     },
+    # operadores y notarios comparten estructura similar
     'operadores': {
-        'grupo': 'grupo',
+        'grupo':             'grupo',
         'asiento_electoral': 'asiento_electoral',
-        'recinto': 'recinto',
-        'nombre': 'nombre',
-        'ci': 'ci',
-        'expedido': 'expedido',
-        'celular': 'celular',
-        'correo': 'correo',
-        'cargo': 'cargo'
+        'recinto':           'recinto',
+        'nombre':            'nombre',
+        'ci':                'ci',
+        'expedido':          'expedido',
+        'celular':           'celular',
+        'correo':            'correo',
+        'cargo':             'cargo',
     },
     'notarios': {
         'asiento_electoral': 'asiento_electoral',
-        'recinto': 'recinto',
-        'nombre': 'nombre',
-        'ci': 'ci',
-        'expedido': 'expedido',
-        'celular': 'celular',
-        'correo': 'correo',
-        'cargo': 'cargo'
+        'recinto':           'recinto',
+        'nombre':            'nombre',
+        'ci':                'ci',
+        'expedido':          'expedido',
+        'celular':           'celular',
+        'correo':            'correo',
+        'cargo':             'cargo',
     },
     'actas': {
         'asiento_electoral': 'asiento_electoral',
-        'recinto': 'recinto',
-        'operador_ci': 'operador_ci',  # 🆕 NUEVA COLUMNA
-        'codigos': 'codigos'
+        'recinto':           'recinto',
+        'operador_ci':       'operador_ci',
+        'codigos':           'codigos',
     },
+    # cuentas: aún se lee desde su hoja y se fusiona en persona
     'cuentas': {
-        'operador': 'operador',
-        'user': 'user',
-        'password': 'password'
-    }
+        'operador': 'operador',   # CI del operador
+        'user':     'user',
+        'password': 'password',
+    },
 }
