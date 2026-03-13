@@ -1,28 +1,31 @@
 # ============================================
-# config.py - ACTUALIZADO PARA ESQUEMA SIMPLIFICADO
+# config.py
+# Cambios v2:
+#   - 'grupos' eliminado como hoja separada → fusionado en coordinador
+#   - 'cuentas' eliminado como hoja separada → columnas en hoja Operadores
 # ============================================
 
 # === GOOGLE SHEETS ===
-SPREADSHEET_ID  = "1ehySw2tVI1l8INo4fgE7kEGFd0Kb2miPs7vCqsFZC8I"
+SPREADSHEET_ID   = "1ehySw2tVI1l8INo4fgE7kEGFd0Kb2miPs7vCqsFZC8I"
 CREDENTIALS_FILE = "generador-docs-31f4b831a196.json"
 
 # === BASE DE DATOS ===
 DATABASE_PATH = "../database/operadores.db"
 
 # === HOJAS DEL GOOGLE SHEET ===
+# 'grupos' ya no existe: cada coordinador tiene una columna 'nombre_grupo'
+# 'cuentas' ya no existe: user/password van directo en la hoja Operadores
 SHEET_NAMES = {
     'jefes':                'Jefes',
-    'coordinadores':        'Coordinadores',
-    'grupos':               'Grupos',
+    'coordinadores':        'Coordinadores',   # ahora incluye columna nombre_grupo
     'departamentos':        'Departamentos',
     'provincias':           'Provincias',
     'municipios':           'Municipios',
     'asientos_electorales': 'Asientos_Electorales',
     'recintos':             'Recintos',
-    'operadores':           'Operadores',
+    'operadores':           'Operadores',      # ahora incluye columnas user y password
     'notarios':             'Notarios',
     'actas':                'Actas',
-    'cuentas':              'Cuentas',   # se fusiona en persona, hoja sigue existiendo
 }
 
 # === MAPEO DE COLUMNAS ===
@@ -32,19 +35,19 @@ COLUMN_MAPPING = {
         'cargo':   'cargo',
         'celular': 'celular',
     },
+
+    # Coordinadores ahora lleva nombre_grupo (antes era hoja aparte)
     'coordinadores': {
-        'jefe':     'jefe',
-        'nombre':   'nombre',
-        'ci':       'ci',
-        'expedido': 'expedido',
-        'celular':  'celular',
-        'correo':   'correo',
-        'cargo':    'cargo',
+        'jefe':         'jefe',
+        'nombre':       'nombre',
+        'ci':           'ci',
+        'expedido':     'expedido',
+        'celular':      'celular',
+        'correo':       'correo',
+        'cargo':        'cargo',
+        'nombre_grupo': 'nombre_grupo',   # ← nuevo: reemplaza hoja Grupos
     },
-    'grupos': {
-        'coordinador_ci': 'coordinador_ci',
-        'nombre':         'nombre',
-    },
+
     'departamentos': {
         'nombre': 'nombre',
     },
@@ -70,9 +73,10 @@ COLUMN_MAPPING = {
         'direccion':         'direccion',
         'distrito':          'distrito',
     },
-    # operadores y notarios comparten estructura similar
+
+    # Operadores ahora incluye user/password (antes era hoja Cuentas)
     'operadores': {
-        'grupo':             'grupo',
+        'coordinador_ci':    'coordinador_ci',    # ← nuevo: asignación directa al coordinador
         'asiento_electoral': 'asiento_electoral',
         'recinto':           'recinto',
         'nombre':            'nombre',
@@ -81,7 +85,10 @@ COLUMN_MAPPING = {
         'celular':           'celular',
         'correo':            'correo',
         'cargo':             'cargo',
+        'user':              'user',              # ← fusionado desde hoja Cuentas
+        'password':          'password',          # ← fusionado desde hoja Cuentas
     },
+
     'notarios': {
         'asiento_electoral': 'asiento_electoral',
         'recinto':           'recinto',
@@ -92,16 +99,10 @@ COLUMN_MAPPING = {
         'correo':            'correo',
         'cargo':             'cargo',
     },
+
+    # Actas: solo lo esencial
     'actas': {
-        'asiento_electoral': 'asiento_electoral',
-        'recinto':           'recinto',
-        'operador_ci':       'operador_ci',
-        'codigos':           'codigos',
-    },
-    # cuentas: aún se lee desde su hoja y se fusiona en persona
-    'cuentas': {
-        'operador': 'operador',   # CI del operador
-        'user':     'user',
-        'password': 'password',
+        'operador_ci': 'operador_ci',
+        'codigos':     'codigos',
     },
 }

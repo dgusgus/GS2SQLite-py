@@ -1,9 +1,11 @@
 # ============================================
-# converters.py - ADAPTADO A ESQUEMA SIMPLIFICADO
-# Cambios:
-#   - convert_operadores y convert_notarios → convert_personas()
-#   - convert_cuentas eliminado (se fusionó en convert_personas)
-#   - convert_actas ya no pasa recinto_id
+# converters.py
+# Cambios v2:
+#   - convert_grupos() eliminado
+#   - convert_coordinadores() ahora guarda nombre_grupo
+#   - convert_personas(): recibe coordinadores_data para resolver coordinador_ci
+#                         user/password vienen directo en operadores_data
+#   - convert_actas(): solo codigo + persona_id
 # ============================================
 
 from typing import Dict, List, Any, Optional
@@ -61,41 +63,33 @@ class DataConverters:
         print(f"   ✅ {count} jefes procesados")
 
     def convert_coordinadores(self, data: List[Dict[str, Any]]):
-        print("👥 Procesando coordinadores...")
+        """
+        Guarda coordinador con nombre_grupo incluido.
+        Ya no existe tabla separada 'grupo'.
+        """
+        print("👥 Procesando coordinadores (con grupo)...")
         count = 0
         for row in data:
-            nombre = self._str(row, COLUMN_MAPPING['coordinadores']['nombre'])
-            if not nombre:
+            ci = self._str(row, COLUMN_MAPPING['coordinadores']['ci'])
+            if not ci:
                 continue
             jefe_nombre = self._str(row, COLUMN_MAPPING['coordinadores']['jefe'])
-            jefe_id = self.db.get_id_by_field('jefe', 'nombre', jefe_nombre) if jefe_nombre else None
+            jefe_id = (
+                self.db.get_id_by_field('jefe', 'nombre', jefe_nombre)
+                if jefe_nombre else None
+            )
             self.db.insert_or_update('coordinador', {
-                'jefe_id':  jefe_id,
-                'nombre':   nombre,
-                'ci':       self._str(row, COLUMN_MAPPING['coordinadores']['ci']),
-                'expedido': self._str(row, COLUMN_MAPPING['coordinadores']['expedido']),
-                'celular':  self._str(row, COLUMN_MAPPING['coordinadores']['celular']),
-                'correo':   self._str(row, COLUMN_MAPPING['coordinadores']['correo']),
-                'cargo':    self._str(row, COLUMN_MAPPING['coordinadores']['cargo']),
+                'ci':           ci,
+                'nombre':       self._str(row, COLUMN_MAPPING['coordinadores']['nombre']),
+                'expedido':     self._str(row, COLUMN_MAPPING['coordinadores']['expedido']),
+                'celular':      self._str(row, COLUMN_MAPPING['coordinadores']['celular']),
+                'correo':       self._str(row, COLUMN_MAPPING['coordinadores']['correo']),
+                'cargo':        self._str(row, COLUMN_MAPPING['coordinadores']['cargo']),
+                'nombre_grupo': self._str(row, COLUMN_MAPPING['coordinadores']['nombre_grupo']),
+                'jefe_id':      jefe_id,
             }, 'ci')
             count += 1
         print(f"   ✅ {count} coordinadores procesados")
-
-    def convert_grupos(self, data: List[Dict[str, Any]]):
-        print("🏢 Procesando grupos...")
-        count = 0
-        for row in data:
-            nombre = self._str(row, COLUMN_MAPPING['grupos']['nombre'])
-            if not nombre:
-                continue
-            coord_ci = self._str(row, COLUMN_MAPPING['grupos']['coordinador_ci'])
-            coord_id = self.db.get_id_by_field('coordinador', 'ci', coord_ci) if coord_ci else None
-            self.db.insert_or_update('grupo', {
-                'coordinador_id': coord_id,
-                'nombre':         nombre,
-            }, 'nombre')
-            count += 1
-        print(f"   ✅ {count} grupos procesados")
 
     # ── GEOGRAFÍA ─────────────────────────────────────────────────────
 
@@ -118,7 +112,10 @@ class DataConverters:
             if not nombre:
                 continue
             depto_nombre = self._str(row, COLUMN_MAPPING['provincias']['departamento'])
-            depto_id = self.db.get_id_by_field('departamento', 'nombre', depto_nombre) if depto_nombre else None
+            depto_id = (
+                self.db.get_id_by_field('departamento', 'nombre', depto_nombre)
+                if depto_nombre else None
+            )
             es_urbano = self._bool(row, COLUMN_MAPPING['provincias']['es_urbano'])
             self.db.insert_or_update('provincia', {
                 'departamento_id': depto_id,
@@ -136,7 +133,10 @@ class DataConverters:
             if not nombre:
                 continue
             prov_nombre = self._str(row, COLUMN_MAPPING['municipios']['provincia'])
-            prov_id = self.db.get_id_by_field('provincia', 'nombre', prov_nombre) if prov_nombre else None
+            prov_id = (
+                self.db.get_id_by_field('provincia', 'nombre', prov_nombre)
+                if prov_nombre else None
+            )
             self.db.insert_or_update('municipio', {
                 'provincia_id': prov_id,
                 'nombre':       nombre,
@@ -152,7 +152,10 @@ class DataConverters:
             if not nombre:
                 continue
             mun_nombre = self._str(row, COLUMN_MAPPING['asientos_electorales']['municipio'])
-            mun_id = self.db.get_id_by_field('municipio', 'nombre', mun_nombre) if mun_nombre else None
+            mun_id = (
+                self.db.get_id_by_field('municipio', 'nombre', mun_nombre)
+                if mun_nombre else None
+            )
             self.db.insert_or_update('asiento_electoral', {
                 'municipio_id': mun_id,
                 'nombre':       nombre,
@@ -168,9 +171,12 @@ class DataConverters:
             if not nombre:
                 continue
             asiento_nombre = self._str(row, COLUMN_MAPPING['recintos']['asiento_electoral'])
-            asiento_id = self.db.get_id_by_field('asiento_electoral', 'nombre', asiento_nombre) if asiento_nombre else None
+            asiento_id = (
+                self.db.get_id_by_field('asiento_electoral', 'nombre', asiento_nombre)
+                if asiento_nombre else None
+            )
             if not asiento_id:
-                print(f"   ⚠️ Asiento '{asiento_nombre}' no encontrado para recinto '{nombre}'")
+                print(f"   ⚠️  Asiento '{asiento_nombre}' no encontrado → recinto '{nombre}' omitido")
                 skipped += 1
                 continue
 
@@ -189,27 +195,22 @@ class DataConverters:
                 inserted += 1
         print(f"   ✅ {inserted} nuevos, {updated} actualizados, {skipped} omitidos")
 
-    # ── PERSONAS (operadores + notarios unificados) ───────────────────
+    # ── PERSONAS ──────────────────────────────────────────────────────
 
-    def convert_personas(self, operadores_data: List[Dict[str, Any]],
-                         notarios_data: List[Dict[str, Any]],
-                         cuentas_data: List[Dict[str, Any]]):
+    def convert_personas(
+        self,
+        operadores_data: List[Dict[str, Any]],
+        notarios_data:   List[Dict[str, Any]],
+    ):
         """
-        Procesa operadores y notarios juntos en la tabla 'persona'.
-        Las cuentas (user/password) se fusionan directamente en cada operador.
+        Procesa operadores y notarios en la tabla 'persona'.
+
+        Cambios v2:
+        - user/password vienen directo en operadores_data (ya no hay hoja Cuentas)
+        - coordinador_id resuelve directamente por ci del coordinador
+          (ya no existe grupo_id)
         """
         print("👷 Procesando personas (operadores + notarios)...")
-
-        # Pre-construir diccionario de cuentas por CI del operador
-        # para poder asignarlas al insertar cada operador
-        cuentas_por_ci: Dict[str, Dict] = {}
-        for row in cuentas_data:
-            operador_ci = self._str(row, COLUMN_MAPPING['cuentas']['operador'])
-            user        = self._str(row, COLUMN_MAPPING['cuentas']['user'])
-            password    = self._str(row, COLUMN_MAPPING['cuentas']['password'])
-            if operador_ci and user:
-                cuentas_por_ci[operador_ci] = {'user': user, 'password': password}
-
         op_count = notario_count = errors = 0
 
         # ── Operadores ────────────────────────────────────────────────
@@ -218,32 +219,40 @@ class DataConverters:
             if not ci:
                 continue
 
-            grupo_nombre   = self._str(row, COLUMN_MAPPING['operadores']['grupo'])
             asiento_nombre = self._str(row, COLUMN_MAPPING['operadores']['asiento_electoral'])
             recinto_nombre = self._str(row, COLUMN_MAPPING['operadores']['recinto'])
-
-            grupo_id   = self.db.get_id_by_field('grupo', 'nombre', grupo_nombre) if grupo_nombre else None
-            recinto_id = self.db.get_recinto_id_by_asiento_and_nombre(asiento_nombre, recinto_nombre)
-
+            recinto_id = self.db.get_recinto_id_by_asiento_and_nombre(
+                asiento_nombre, recinto_nombre
+            )
             if not recinto_id:
-                print(f"   ⚠️ Recinto '{recinto_nombre}' en '{asiento_nombre}' no encontrado (operador CI {ci})")
+                print(
+                    f"   ⚠️  Recinto '{recinto_nombre}' / '{asiento_nombre}' "
+                    f"no encontrado (operador CI {ci})"
+                )
                 errors += 1
                 continue
 
-            cuenta = cuentas_por_ci.get(ci, {})
+            coord_ci = self._str(row, COLUMN_MAPPING['operadores']['coordinador_ci'])
+            coordinador_id = (
+                self.db.get_id_by_field('coordinador', 'ci', coord_ci)
+                if coord_ci else None
+            )
+
+            user     = self._str(row, COLUMN_MAPPING['operadores']['user'])     or None
+            password = self._str(row, COLUMN_MAPPING['operadores']['password']) or None
 
             self.db.insert_or_update('persona', {
-                'tipo':       'operador',
-                'nombre':     self._str(row, COLUMN_MAPPING['operadores']['nombre']),
-                'ci':         ci,
-                'expedido':   self._str(row, COLUMN_MAPPING['operadores']['expedido']),
-                'celular':    self._str(row, COLUMN_MAPPING['operadores']['celular']),
-                'correo':     self._str(row, COLUMN_MAPPING['operadores']['correo']),
-                'cargo':      self._str(row, COLUMN_MAPPING['operadores']['cargo']),
-                'recinto_id': recinto_id,
-                'grupo_id':   grupo_id,
-                'user':       cuenta.get('user') or None,
-                'password':   cuenta.get('password') or None,
+                'tipo':           'operador',
+                'nombre':         self._str(row, COLUMN_MAPPING['operadores']['nombre']),
+                'ci':             ci,
+                'expedido':       self._str(row, COLUMN_MAPPING['operadores']['expedido']),
+                'celular':        self._str(row, COLUMN_MAPPING['operadores']['celular']),
+                'correo':         self._str(row, COLUMN_MAPPING['operadores']['correo']),
+                'cargo':          self._str(row, COLUMN_MAPPING['operadores']['cargo']),
+                'recinto_id':     recinto_id,
+                'coordinador_id': coordinador_id,
+                'user':           user,
+                'password':       password,
             }, 'ci')
             op_count += 1
 
@@ -255,55 +264,62 @@ class DataConverters:
 
             asiento_nombre = self._str(row, COLUMN_MAPPING['notarios']['asiento_electoral'])
             recinto_nombre = self._str(row, COLUMN_MAPPING['notarios']['recinto'])
-            recinto_id     = self.db.get_recinto_id_by_asiento_and_nombre(asiento_nombre, recinto_nombre)
-
+            recinto_id = self.db.get_recinto_id_by_asiento_and_nombre(
+                asiento_nombre, recinto_nombre
+            )
             if not recinto_id:
-                print(f"   ⚠️ Recinto '{recinto_nombre}' en '{asiento_nombre}' no encontrado (notario CI {ci})")
+                print(
+                    f"   ⚠️  Recinto '{recinto_nombre}' / '{asiento_nombre}' "
+                    f"no encontrado (notario CI {ci})"
+                )
                 errors += 1
                 continue
 
             self.db.insert_or_update('persona', {
-                'tipo':       'notario',
-                'nombre':     self._str(row, COLUMN_MAPPING['notarios']['nombre']),
-                'ci':         ci,
-                'expedido':   self._str(row, COLUMN_MAPPING['notarios']['expedido']),
-                'celular':    self._str(row, COLUMN_MAPPING['notarios']['celular']),
-                'correo':     self._str(row, COLUMN_MAPPING['notarios']['correo']),
-                'cargo':      self._str(row, COLUMN_MAPPING['notarios']['cargo']),
-                'recinto_id': recinto_id,
-                'grupo_id':   None,
-                'user':       None,
-                'password':   None,
+                'tipo':           'notario',
+                'nombre':         self._str(row, COLUMN_MAPPING['notarios']['nombre']),
+                'ci':             ci,
+                'expedido':       self._str(row, COLUMN_MAPPING['notarios']['expedido']),
+                'celular':        self._str(row, COLUMN_MAPPING['notarios']['celular']),
+                'correo':         self._str(row, COLUMN_MAPPING['notarios']['correo']),
+                'cargo':          self._str(row, COLUMN_MAPPING['notarios']['cargo']),
+                'recinto_id':     recinto_id,
+                'coordinador_id': None,
+                'user':           None,
+                'password':       None,
             }, 'ci')
             notario_count += 1
 
-        print(f"   ✅ {op_count} operadores, {notario_count} notarios procesados, {errors} errores")
+        print(
+            f"   ✅ {op_count} operadores, {notario_count} notarios procesados, "
+            f"{errors} errores"
+        )
 
     # ── ACTAS ─────────────────────────────────────────────────────────
 
     def convert_actas(self, data: List[Dict[str, Any]]):
         """
-        Acta → persona_id (operador).
-        recinto_id ya no se almacena: se obtiene desde persona.recinto_id.
+        Actas simplificadas: solo codigo + persona_id.
+        El recinto se obtiene siempre via persona.recinto_id.
         """
         print("📄 Procesando actas...")
-        total = recintos_ok = errors = 0
+        total = asignaciones_ok = errors = 0
 
         for row in data:
             operador_ci = self._str(row, COLUMN_MAPPING['actas']['operador_ci'])
             codigos_str = self._str(row, COLUMN_MAPPING['actas']['codigos'])
 
-            if not codigos_str:
+            if not operador_ci:
                 errors += 1
                 continue
-            if not operador_ci:
-                print(f"   ⚠️ Fila sin operador_ci, omitida")
+            if not codigos_str:
+                self._warn_fila(operador_ci, "sin códigos")
                 errors += 1
                 continue
 
             persona_id = self.db.get_id_by_field('persona', 'ci', operador_ci)
             if not persona_id:
-                print(f"   ⚠️ Operador CI '{operador_ci}' no encontrado")
+                print(f"   ⚠️  Operador CI '{operador_ci}' no encontrado")
                 errors += 1
                 continue
 
@@ -324,23 +340,43 @@ class DataConverters:
                     errors += 1
 
             if actas_ok:
-                recintos_ok += 1
-                print(f"   ✅ {actas_ok} actas → Operador CI {operador_ci}")
+                asignaciones_ok += 1
 
-        print(f"   📊 {total} actas en {recintos_ok} asignaciones, {errors} errores")
+        print(f"   📊 {total} actas en {asignaciones_ok} asignaciones, {errors} errores")
+
+    def _warn_fila(self, ci: str, msg: str):
+        print(f"   ⚠️  Operador CI {ci}: {msg}")
 
     # ── HELPERS PRIVADOS ──────────────────────────────────────────────
 
     def _separar_codigos(self, codigos_str: str) -> List[str]:
         if not codigos_str or not codigos_str.strip():
             return []
-        s = codigos_str.strip()
-        for sep in [',', ';', '|', '\t']:
+
+        # Convertir a string por si Google Sheets lo entregó como número
+        s = str(codigos_str).strip()
+
+        # Caso 1: hay separador explícito → dividir y limpiar vacíos (comas finales)
+        for sep in [",", ";", "|", "\t"]:
             if sep in s:
                 parts = [c.strip() for c in s.split(sep) if c.strip()]
-                if len(parts) > 1:
+                return parts
+
+        # Caso 2: string largo de solo dígitos sin separador
+        # (Google Sheets a veces borra las comas de celdas numéricas)
+        # Intentar dividir en chunks del mismo tamaño probando de 6 a 10 dígitos
+        s_clean = s.replace(" ", "")
+        if len(s_clean) > 10 and s_clean.isdigit():
+            for chunk_size in range(6, 11):
+                if len(s_clean) % chunk_size == 0:
+                    parts = [s_clean[i:i + chunk_size]
+                             for i in range(0, len(s_clean), chunk_size)]
+                    print(f"   ℹ️  Códigos pegados detectados → separados en "
+                          f"{len(parts)} grupos de {chunk_size} dígitos")
                     return parts
-        return [s]
+
+        # Caso 3: código único
+        return [s_clean if s_clean else s]
 
     def _validar_codigo(self, codigo: str) -> bool:
         if not codigo or not isinstance(codigo, str):

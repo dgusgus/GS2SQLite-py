@@ -1,15 +1,16 @@
 # ============================================
-# database.py - ESQUEMA SIMPLIFICADO
-# Mejoras aplicadas:
-#   1. acta ya no tiene recinto_id (se hereda del operador)
-#   2. operador y notario unificados en tabla 'persona' (campo tipo)
-#   3. cuenta fusionada dentro de persona (user, password)
+# database.py
+# Cambios v2:
+#   - tabla 'grupo' eliminada: coordinador tiene campo nombre_grupo
+#   - persona.grupo_id → persona.coordinador_id (referencia directa)
+#   - acta: solo codigo + persona_id (sin recinto_id)
 # ============================================
 
 import sqlite3
 from pathlib import Path
 from typing import Dict, Any, Optional, Union
 from config import DATABASE_PATH
+
 
 class DatabaseManager:
     def __init__(self, db_path: str = DATABASE_PATH):
@@ -18,11 +19,11 @@ class DatabaseManager:
         print(f"Base de datos: {self.db_path}")
 
     def get_connection(self):
-        return sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA foreign_keys = ON")
+        return conn
 
     def create_schema(self):
-        """Esquema simplificado"""
-
         tables_sql = {
 
             # ── ORGANIZACIÓN ──────────────────────────────────────────
@@ -35,30 +36,24 @@ class DatabaseManager:
                 )
             """,
 
+            # nombre_grupo fusionado aquí; antes era tabla separada
             'coordinador': """
                 CREATE TABLE IF NOT EXISTS coordinador (
-                    id       INTEGER PRIMARY KEY AUTOINCREMENT,
-                    nombre   TEXT NOT NULL,
-                    ci       TEXT UNIQUE NOT NULL,
-                    expedido TEXT,
-                    celular  TEXT,
-                    correo   TEXT,
-                    cargo    TEXT,
-                    jefe_id  INTEGER NOT NULL,
+                    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nombre       TEXT NOT NULL,
+                    ci           TEXT UNIQUE NOT NULL,
+                    expedido     TEXT,
+                    celular      TEXT,
+                    correo       TEXT,
+                    cargo        TEXT,
+                    nombre_grupo TEXT,
+                    jefe_id      INTEGER,
                     FOREIGN KEY (jefe_id) REFERENCES jefe(id)
                 )
             """,
+            # jefe_id es NULL-able: coordinador puede no tener jefe asignado aún
 
-            'grupo': """
-                CREATE TABLE IF NOT EXISTS grupo (
-                    id             INTEGER PRIMARY KEY AUTOINCREMENT,
-                    nombre         TEXT NOT NULL UNIQUE,
-                    coordinador_id INTEGER NOT NULL,
-                    FOREIGN KEY (coordinador_id) REFERENCES coordinador(id)
-                )
-            """,
-
-            # ── GEOGRAFÍA (se mantiene completa) ──────────────────────
+            # ── GEOGRAFÍA ─────────────────────────────────────────────
             'departamento': """
                 CREATE TABLE IF NOT EXISTS departamento (
                     id     INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -109,31 +104,30 @@ class DatabaseManager:
                 )
             """,
 
-            # ── PERSONAS (operador + notario unificados) ───────────────
-            # tipo     : 'operador' | 'notario'
-            # grupo_id : NULL para notarios
-            # user/password: NULL si no tiene cuenta
+            # ── PERSONAS ──────────────────────────────────────────────
+            # coordinador_id reemplaza grupo_id (vínculo directo al coordinador)
+            # user/password fusionados (antes eran hoja Cuentas)
             'persona': """
                 CREATE TABLE IF NOT EXISTS persona (
-                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                    tipo       TEXT NOT NULL CHECK(tipo IN ('operador', 'notario')),
-                    nombre     TEXT NOT NULL,
-                    ci         TEXT UNIQUE NOT NULL,
-                    expedido   TEXT,
-                    celular    TEXT,
-                    correo     TEXT,
-                    cargo      TEXT,
-                    recinto_id INTEGER NOT NULL,
-                    grupo_id   INTEGER,
-                    user       TEXT UNIQUE,
-                    password   TEXT,
-                    FOREIGN KEY (recinto_id) REFERENCES recinto(id),
-                    FOREIGN KEY (grupo_id)   REFERENCES grupo(id)
+                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tipo            TEXT NOT NULL CHECK(tipo IN ('operador', 'notario')),
+                    nombre          TEXT NOT NULL,
+                    ci              TEXT UNIQUE NOT NULL,
+                    expedido        TEXT,
+                    celular         TEXT,
+                    correo          TEXT,
+                    cargo           TEXT,
+                    recinto_id      INTEGER NOT NULL,
+                    coordinador_id  INTEGER,
+                    user            TEXT UNIQUE,
+                    password        TEXT,
+                    FOREIGN KEY (recinto_id)     REFERENCES recinto(id),
+                    FOREIGN KEY (coordinador_id) REFERENCES coordinador(id)
                 )
             """,
 
-            # ── DOCUMENTOS ────────────────────────────────────────────
-            # recinto_id eliminado: se obtiene via persona.recinto_id
+            # ── ACTAS ─────────────────────────────────────────────────
+            # Solo codigo + persona_id; recinto se hereda via persona.recinto_id
             'acta': """
                 CREATE TABLE IF NOT EXISTS acta (
                     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -144,9 +138,18 @@ class DatabaseManager:
             """,
         }
 
+        # ── ÍNDICES ───────────────────────────────────────────────────
+        indexes_sql = [
+            "CREATE INDEX IF NOT EXISTS idx_persona_ci         ON persona(ci)",
+            "CREATE INDEX IF NOT EXISTS idx_persona_tipo       ON persona(tipo)",
+            "CREATE INDEX IF NOT EXISTS idx_persona_coordinador ON persona(coordinador_id)",
+            "CREATE INDEX IF NOT EXISTS idx_acta_persona       ON acta(persona_id)",
+            "CREATE INDEX IF NOT EXISTS idx_recinto_asiento    ON recinto(asiento_id)",
+            "CREATE INDEX IF NOT EXISTS idx_coordinador_jefe   ON coordinador(jefe_id)",
+        ]
+
         # ── VISTAS ────────────────────────────────────────────────────
         views_sql = {
-
             'v_operadores': """
                 CREATE VIEW IF NOT EXISTS v_operadores AS
                 SELECT
@@ -157,8 +160,9 @@ class DatabaseManager:
                     p.correo,
                     p.cargo,
                     p.user,
-                    g.nombre        AS grupo,
+                    c.nombre_grupo  AS grupo,
                     c.nombre        AS coordinador,
+                    c.ci            AS coordinador_ci,
                     j.nombre        AS jefe,
                     r.nombre        AS recinto,
                     r.direccion     AS recinto_direccion,
@@ -173,8 +177,7 @@ class DatabaseManager:
                 JOIN municipio m          ON ae.municipio_id = m.id
                 JOIN provincia pr         ON m.provincia_id = pr.id
                 JOIN departamento d       ON pr.departamento_id = d.id
-                LEFT JOIN grupo g         ON p.grupo_id = g.id
-                LEFT JOIN coordinador c   ON g.coordinador_id = c.id
+                LEFT JOIN coordinador c   ON p.coordinador_id = c.id
                 LEFT JOIN jefe j          ON c.jefe_id = j.id
                 WHERE p.tipo = 'operador'
             """,
@@ -211,6 +214,8 @@ class DatabaseManager:
                     p.nombre        AS operador,
                     p.ci            AS operador_ci,
                     p.celular       AS operador_celular,
+                    c.nombre_grupo  AS grupo,
+                    c.nombre        AS coordinador,
                     r.nombre        AS recinto,
                     r.direccion     AS recinto_direccion,
                     ae.nombre       AS asiento_electoral,
@@ -224,6 +229,7 @@ class DatabaseManager:
                 JOIN municipio m          ON ae.municipio_id = m.id
                 JOIN provincia pr         ON m.provincia_id = pr.id
                 JOIN departamento d       ON pr.departamento_id = d.id
+                LEFT JOIN coordinador c   ON p.coordinador_id = c.id
             """,
 
             'v_recintos': """
@@ -244,15 +250,36 @@ class DatabaseManager:
                 JOIN provincia pr         ON m.provincia_id = pr.id
                 JOIN departamento d       ON pr.departamento_id = d.id
             """,
+
+            'v_coordinadores': """
+                CREATE VIEW IF NOT EXISTS v_coordinadores AS
+                SELECT
+                    c.id,
+                    c.nombre,
+                    c.ci,
+                    c.celular,
+                    c.correo,
+                    c.cargo,
+                    c.nombre_grupo  AS grupo,
+                    j.nombre        AS jefe,
+                    COUNT(p.id)     AS total_operadores
+                FROM coordinador c
+                LEFT JOIN jefe j    ON c.jefe_id = j.id
+                LEFT JOIN persona p ON p.coordinador_id = c.id AND p.tipo = 'operador'
+                GROUP BY c.id
+            """,
         }
 
         with self.get_connection() as conn:
             for table_name, sql in tables_sql.items():
                 conn.execute(sql)
-                print(f"✅ Tabla '{table_name}' creada/verificada")
+                print(f"  ✅ Tabla '{table_name}' lista")
+            for idx_sql in indexes_sql:
+                conn.execute(idx_sql)
+            print(f"  ✅ Índices creados")
             for view_name, sql in views_sql.items():
                 conn.execute(sql)
-                print(f"✅ Vista '{view_name}' creada/verificada")
+                print(f"  ✅ Vista '{view_name}' lista")
 
         print("✅ Esquema listo")
 
@@ -260,13 +287,15 @@ class DatabaseManager:
 
     def insert_or_update(self, table: str, data: Dict[str, Any], unique_field: str) -> int:
         if not data or unique_field not in data:
-            raise ValueError(f"Campo único '{unique_field}' no encontrado en datos")
+            raise ValueError(f"Campo único '{unique_field}' no en datos")
 
         with self.get_connection() as conn:
             cursor = conn.cursor()
             try:
-                cursor.execute(f"SELECT id FROM {table} WHERE {unique_field} = ?",
-                               (data[unique_field],))
+                cursor.execute(
+                    f"SELECT id FROM {table} WHERE {unique_field} = ?",
+                    (data[unique_field],)
+                )
                 existing = cursor.fetchone()
 
                 if existing:
@@ -275,21 +304,24 @@ class DatabaseManager:
                         fields = ", ".join(f"{k} = ?" for k in update_data)
                         values = list(update_data.values()) + [data[unique_field]]
                         cursor.execute(
-                            f"UPDATE {table} SET {fields} WHERE {unique_field} = ?", values)
+                            f"UPDATE {table} SET {fields} WHERE {unique_field} = ?",
+                            values
+                        )
                     return existing[0]
                 else:
                     fields = ", ".join(data.keys())
                     placeholders = ", ".join("?" for _ in data)
                     cursor.execute(
                         f"INSERT INTO {table} ({fields}) VALUES ({placeholders})",
-                        list(data.values()))
+                        list(data.values())
+                    )
                     return cursor.lastrowid
 
             except sqlite3.IntegrityError as e:
-                print(f"   ⚠️ Integridad en {table}: {e}")
+                print(f"  ⚠️  Integridad en {table}: {e}")
                 raise
             except sqlite3.Error as e:
-                print(f"   ⚠️ Error en {table}: {e}")
+                print(f"  ⚠️  Error en {table}: {e}")
                 raise
 
     def get_id_by_field(self, table: str, field: str, value: Union[str, int]) -> Optional[int]:
@@ -304,7 +336,9 @@ class DatabaseManager:
             result = cursor.fetchone()
             return result[0] if result else None
 
-    def get_recinto_id_by_asiento_and_nombre(self, asiento_nombre: str, recinto_nombre: str) -> Optional[int]:
+    def get_recinto_id_by_asiento_and_nombre(
+        self, asiento_nombre: str, recinto_nombre: str
+    ) -> Optional[int]:
         if not asiento_nombre or not recinto_nombre:
             return None
         with self.get_connection() as conn:
@@ -324,8 +358,10 @@ class DatabaseManager:
             cursor = conn.cursor()
             fields = ", ".join(data.keys())
             placeholders = ", ".join("?" for _ in data)
-            cursor.execute(f"INSERT INTO {table} ({fields}) VALUES ({placeholders})",
-                           list(data.values()))
+            cursor.execute(
+                f"INSERT INTO {table} ({fields}) VALUES ({placeholders})",
+                list(data.values())
+            )
             return cursor.lastrowid
 
     def update_record(self, table: str, data: Dict[str, Any], record_id: int) -> bool:
@@ -338,7 +374,7 @@ class DatabaseManager:
 
     def get_stats(self) -> Dict[str, int]:
         tables = [
-            'jefe', 'coordinador', 'grupo',
+            'jefe', 'coordinador',
             'departamento', 'provincia', 'municipio',
             'asiento_electoral', 'recinto',
             'persona', 'acta',
